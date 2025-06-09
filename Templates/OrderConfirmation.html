@@ -1,0 +1,86 @@
+﻿<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #fff8f0;
+            color: #333;
+            padding: 30px;
+            line-height: 1.6;
+        }
+
+        h2 {
+            color: #b33939;
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+
+        .container {
+            background: #ffffff;
+            border: 1px solid #e67e22;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+        }
+
+        .order-summary {
+            margin-top: 20px;
+        }
+
+            .order-summary p {
+                margin: 6px 0;
+            }
+
+        .cart-items {
+            margin-top: 20px;
+        }
+
+            .cart-items ul {
+                list-style: none;
+                padding: 0;
+            }
+
+            .cart-items li {
+                background-color: #fff3e6;
+                margin-bottom: 10px;
+                padding: 12px;
+                border-left: 4px solid #e67e22;
+                border-radius: 6px;
+            }
+
+        .footer {
+            margin-top: 30px;
+            font-size: 14px;
+            color: #777;
+        }
+
+        strong {
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Dziękujemy za zamówienie!</h2>
+        <p>Cześć <strong>{{UserEmail}}</strong>,</p>
+        <p>Twoje zamówienie zostało przyjęte do realizacji. Oto szczegóły:</p>
+
+        <div class="order-summary">
+            <p><strong>ID koszyka:</strong> {{CartId}}</p>
+            <p><strong>Łączna kwota:</strong> {{Total}} zł</p>
+            <p><strong>Adres dostawy:</strong> {{Address}}</p>
+        </div>
+
+        <div class="cart-items">
+            <h3>Pozycje zamówienia:</h3>
+            <ul>
+                {{CartItems}}
+            </ul>
+        </div>
+
+        <p class="footer">Wkrótce otrzymasz kolejne informacje o statusie zamówienia.<br />Smacznego! 🍽️</p>
+    </div>
+</body>
+</html>
