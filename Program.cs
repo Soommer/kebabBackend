@@ -109,7 +109,9 @@ namespace kebabBackend
                            .AllowAnyMethod();
                     policy.WithOrigins("https://green-flower-00291e603.2.azurestaticapps.net")
                         .AllowAnyHeader()
-                        .AllowAnyMethod();
+                        .AllowAnyMethod()
+                        .AllowCredentials() 
+                        .WithExposedHeaders("Authorization", "Location");
                     policy.WithOrigins("http://localhost:4200")
                           .AllowAnyHeader()
                           .AllowAnyMethod();
