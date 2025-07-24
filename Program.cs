@@ -16,6 +16,7 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using System.Text;
 using Serilog;
+using Azure.Storage.Blobs;
 
 namespace kebabBackend
 {
@@ -91,18 +92,31 @@ namespace kebabBackend
                     { jwtSecurityScheme, Array.Empty<string>() }
                 });
             });
+            // image blob
+            builder.Services.AddSingleton(x =>
+            {
+                var config = x.GetRequiredService<IConfiguration>();
+                return new BlobServiceClient(config["AzureBlob:ConnectionString"]);
+            });
 
             // CORS
-            builder.Services.AddCors(options =>
+            builder.Services.AddCors(options => 
             {
                 options.AddPolicy("AllowFrontend", policy =>
                 {
+                    policy.WithOrigins("https://zealous-stone-0b5e11903.2.azurestaticapps.net")
+                           .AllowAnyHeader()
+                           .AllowAnyMethod();
+                    policy.WithOrigins("https://green-flower-00291e603.2.azurestaticapps.net")
+                        .AllowAnyHeader()
+                        .AllowAnyMethod();
                     policy.WithOrigins("http://localhost:4200")
                           .AllowAnyHeader()
                           .AllowAnyMethod();
                     policy.WithOrigins("http://localhost:4400")
                           .AllowAnyHeader()
-                          .AllowAnyMethod();
+                          .AllowAnyMethod()
+                          .AllowCredentials();
                 });
             });
 
@@ -142,15 +156,20 @@ namespace kebabBackend
                 app.UseAuthorization();
                 app.MapHub<OrderHub>("/orderHub");
 
-                // Static files
+
+                /*
+                // Static files local storage
                 var imageFolder = Path.Combine(app.Environment.ContentRootPath, "Images");
                 Directory.CreateDirectory(imageFolder);
+                
+                
+                
                 app.UseStaticFiles(new StaticFileOptions
                 {
                     FileProvider = new PhysicalFileProvider(imageFolder),
                     RequestPath = "/Images"
                 });
-
+                */
                 app.MapControllers();
                 try
                 {

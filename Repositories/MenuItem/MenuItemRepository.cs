@@ -1,4 +1,5 @@
-﻿using kebabBackend.Data;
+﻿using Azure.Storage.Blobs;
+using kebabBackend.Data;
 using kebabBackend.Models.Domain;
 using kebabBackend.Models.DTO;
 using Microsoft.AspNetCore.Hosting;
@@ -12,12 +13,14 @@ namespace kebabBackend.Repositories.MenuItem
         private readonly KebabDbContext DbContext;
         private readonly IWebHostEnvironment _env;
         private readonly IHttpContextAccessor _httpContextAccessor;
+        private readonly BlobServiceClient _blobServiceClient;
 
-        public MenuItemRepository(KebabDbContext dbContext, IWebHostEnvironment env, IHttpContextAccessor httpContextAccessor)
+        public MenuItemRepository(KebabDbContext dbContext, IWebHostEnvironment env, IHttpContextAccessor httpContextAccessor, BlobServiceClient blobServiceClient)
         {
             DbContext = dbContext;
             _env = env;
             _httpContextAccessor = httpContextAccessor;
+            _blobServiceClient = blobServiceClient;
         }
 
         public async Task<menuItem> AddMenuItemAsync(menuItem menuItem, IFormFile imageFile)
@@ -33,14 +36,16 @@ namespace kebabBackend.Repositories.MenuItem
 
             var imageId = Guid.NewGuid();
             var fileName = $"{imageId}{extension}";
-            var imageFolder = Path.Combine(_env.ContentRootPath, "Images");
-            Directory.CreateDirectory(imageFolder);
-            var localPath = Path.Combine(imageFolder, fileName);
 
-            await using var stream = new FileStream(localPath, FileMode.Create);
-            await imageFile.CopyToAsync(stream);
+            // Upload to Blob
+            var blobClient = _blobServiceClient
+                .GetBlobContainerClient("images")
+                .GetBlobClient(fileName);
 
-            var urlPath = $"{_httpContextAccessor.HttpContext!.Request.Scheme}://{_httpContextAccessor.HttpContext.Request.Host}{_httpContextAccessor.HttpContext.Request.PathBase}/Images/{fileName}";
+            await using var stream = imageFile.OpenReadStream();
+            await blobClient.UploadAsync(stream, overwrite: true);
+
+            var blobUrl = blobClient.Uri.ToString();
 
             var kebabImage = new kebabImage
             {
@@ -48,7 +53,7 @@ namespace kebabBackend.Repositories.MenuItem
                 Name = imageFile.FileName,
                 FileExtention = extension,
                 FileSizeInBytes = imageFile.Length,
-                FilePath = urlPath
+                FilePath = blobUrl
             };
 
             var category = await DbContext.menuItemCategories.FindAsync(menuItem.CategoryId)
@@ -65,6 +70,7 @@ namespace kebabBackend.Repositories.MenuItem
 
             return menuItem;
         }
+
 
         public async Task<IEnumerable<MenuItemReturn>> GetAllMenuItemsAsync(Guid? categoryId = null)
         {
@@ -86,7 +92,7 @@ namespace kebabBackend.Repositories.MenuItem
                     Name = m.Name,
                     Description = m.Description,
                     BasePrice = m.BasePrice,
-                    ImagePath = m.Image.FilePath,
+                    ImagePath =$"https://blobkebab.blob.core.windows.net/images/{m.Image.FilePath}",
                     CategoryName = m.Category.Name,
                 })
                 .ToListAsync();
