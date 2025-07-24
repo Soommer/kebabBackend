@@ -92,7 +92,7 @@ namespace kebabBackend.Repositories.MenuItem
                     Name = m.Name,
                     Description = m.Description,
                     BasePrice = m.BasePrice,
-                    ImagePath =$"https://blobkebab.blob.core.windows.net/images/{m.Image.FilePath}",
+                    ImagePath =$"{m.Image.FilePath}",
                     CategoryName = m.Category.Name,
                 })
                 .ToListAsync();
