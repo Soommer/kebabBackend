@@ -223,8 +223,8 @@ namespace kebabBackend.Controllers
                     }
                 },
                 Mode = "payment",
-                SuccessUrl = "http://localhost:4200/success",
-                CancelUrl = "http://localhost:4200/cancel",
+                SuccessUrl = "https://green-flower-00291e603.2.azurestaticapps.net/success",
+                CancelUrl = "https://green-flower-00291e603.2.azurestaticapps.net/cancel",
                 Metadata = new Dictionary<string, string>
                 {
                     { "cartId", cart.Id.ToString() },
