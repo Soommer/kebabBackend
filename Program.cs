@@ -17,6 +17,7 @@ using Microsoft.OpenApi.Models;
 using System.Text;
 using Serilog;
 using Azure.Storage.Blobs;
+using Microsoft.Extensions.Options;
 
 namespace kebabBackend
 {
@@ -34,7 +35,10 @@ namespace kebabBackend
             var builder = WebApplication.CreateBuilder(args);
             var config = builder.Configuration;
 
-            builder.Services.AddSignalR();
+            builder.Services.AddSignalR(options =>
+            {
+                options.KeepAliveInterval = TimeSpan.FromSeconds(20);
+            });
             builder.Host.UseSerilog();
 
             builder.Services.AddControllers();
@@ -53,7 +57,7 @@ namespace kebabBackend
             })
             .AddJwtBearer(options =>
             {
-                options.RequireHttpsMetadata = true;
+                options.RequireHttpsMetadata = false;
                 options.SaveToken = true;
                 options.TokenValidationParameters = new TokenValidationParameters
                 {
@@ -100,23 +104,23 @@ namespace kebabBackend
             });
 
             // CORS
-            builder.Services.AddCors(options =>
-            {
-                options.AddPolicy("AllowFrontend", policy =>
-                {
-                    policy.WithOrigins(
-                            "https://zealous-stone-0b5e11903.2.azurestaticapps.net",
-                            "https://green-flower-00291e603.2.azurestaticapps.net",
-                            "https://mango-plant-0d70ff103.1.azurestaticapps.net",
-                            "http://localhost:4200",
-                            "http://localhost:4400"
-                        )
-                        .AllowAnyHeader()
-                        .AllowAnyMethod()
-                        .AllowCredentials()
-                        .WithExposedHeaders("Authorization", "Location");
-                });
-            });
+builder.Services.AddCors(options => 
+{
+    options.AddPolicy("AllowFrontend", policy =>
+    {
+        policy.WithOrigins(
+                "https://zealous-stone-0b5e11903.2.azurestaticapps.net",
+                "https://green-flower-00291e603.2.azurestaticapps.net",
+                "https://mango-plant-0d70ff103.1.azurestaticapps.net",
+                "http://localhost:4200",
+                "http://localhost:4400"
+            )
+            .AllowAnyHeader()
+            .AllowAnyMethod()
+            .AllowCredentials()
+            .WithExposedHeaders("Authorization", "Location");
+    });
+});
 
             // DbContext
             builder.Services.AddDbContext<KebabDbContext>(options =>
@@ -147,8 +151,10 @@ namespace kebabBackend
                 app.UseSwaggerUI();
                 //}
 
-                app.UseHttpsRedirection();
                 app.UseCors("AllowFrontend");
+
+
+                app.UseHttpsRedirection();
 
                 app.UseAuthentication();
                 app.UseAuthorization();
