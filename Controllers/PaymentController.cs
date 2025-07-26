@@ -119,7 +119,7 @@ namespace kebabBackend.Controllers
                     await _emailService.SendHtmlEmail(
                         emailStr,
                         "Potwierdzenie płatności - Kebab King",
-                        "Templates/PaymentConfirmation.html",
+                        "PaymentConfirmation.html",
                         new Dictionary<string, string>
                         {
                             { "UserEmail", emailStr },
@@ -239,7 +239,7 @@ namespace kebabBackend.Controllers
             await _emailService.SendHtmlEmail(
                 request.Email,
                 "Potwierdzenie zamówienia - Kebab King",
-                "Templates/OrderConfirmation.html", 
+                "OrderConfirmation.html", 
                 new Dictionary<string, string>
                 {
                     { "UserEmail", request.Email },

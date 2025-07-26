@@ -100,25 +100,21 @@ namespace kebabBackend
             });
 
             // CORS
-            builder.Services.AddCors(options => 
+            builder.Services.AddCors(options =>
             {
                 options.AddPolicy("AllowFrontend", policy =>
                 {
-                    policy.WithOrigins("https://zealous-stone-0b5e11903.2.azurestaticapps.net")
-                           .AllowAnyHeader()
-                           .AllowAnyMethod();
-                    policy.WithOrigins("https://green-flower-00291e603.2.azurestaticapps.net")
+                    policy.WithOrigins(
+                            "https://zealous-stone-0b5e11903.2.azurestaticapps.net",
+                            "https://green-flower-00291e603.2.azurestaticapps.net",
+                            "https://mango-plant-0d70ff103.1.azurestaticapps.net",
+                            "http://localhost:4200",
+                            "http://localhost:4400"
+                        )
                         .AllowAnyHeader()
                         .AllowAnyMethod()
-                        .AllowCredentials() 
+                        .AllowCredentials()
                         .WithExposedHeaders("Authorization", "Location");
-                    policy.WithOrigins("http://localhost:4200")
-                          .AllowAnyHeader()
-                          .AllowAnyMethod();
-                    policy.WithOrigins("http://localhost:4400")
-                          .AllowAnyHeader()
-                          .AllowAnyMethod()
-                          .AllowCredentials();
                 });
             });
 
