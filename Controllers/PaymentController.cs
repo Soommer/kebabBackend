@@ -1,5 +1,4 @@
-﻿using Azure;
-using kebabBackend.Data;
+﻿using kebabBackend.Data;
 using kebabBackend.Models.DTO;
 using kebabBackend.Services;
 using Microsoft.AspNetCore.Mvc;
@@ -22,7 +21,8 @@ namespace kebabBackend.Controllers
         private readonly AzureMapsDistanceService _azureMapsDistanceService;
         private readonly IHubContext<OrderHub> _hubContext;
 
-        public PaymentController(KebabDbContext context,
+        public PaymentController(
+            KebabDbContext context,
             IConfiguration configuration,
             EmailService emailService,
             AzureMapsDistanceService azureMapsDistanceService,
@@ -33,10 +33,9 @@ namespace kebabBackend.Controllers
             _configuration = configuration;
             _emailService = emailService;
             _azureMapsDistanceService = azureMapsDistanceService;
-            _logger = logger;   
+            _logger = logger;
             _hubContext = hubContext;
         }
-
         [HttpPost("webhook")]
         public async Task<IActionResult> StripeWebhook()
         {
@@ -53,117 +52,69 @@ namespace kebabBackend.Controllers
                 if (stripeEvent.Type == EventTypes.CheckoutSessionCompleted)
                 {
                     var session = stripeEvent.Data.Object as Session;
-                    if (session?.Metadata == null || !session.Metadata.ContainsKey("cartId") || !session.Metadata.ContainsKey("address") || !session.Metadata.ContainsKey("email"))
+                    if (session?.Metadata == null ||
+                        !session.Metadata.ContainsKey("cartId") ||
+                        !session.Metadata.ContainsKey("address") ||
+                        !session.Metadata.ContainsKey("email"))
                     {
-                        _logger.LogWarning("Brak cartId");
-                        return BadRequest("cartId missing");
+                        _logger.LogWarning("Brak wymaganych metadanych w sesji Stripe");
+                        return BadRequest("Brakuje danych w metadanych");
                     }
 
                     var cartIdStr = session.Metadata["cartId"];
                     if (!Guid.TryParse(cartIdStr, out var cartId))
                     {
-                        _logger.LogWarning("Złe cartId");
-                        return BadRequest("cartId invalid");
+                        _logger.LogWarning("Nieprawidłowy format cartId: {cartId}", cartIdStr);
+                        return BadRequest("Nieprawidłowy cartId");
                     }
 
-                    var addressStr = session.Metadata["address"];
-
-                    var emailStr = session.Metadata["email"];
-
-
-
-                    var cart = await _context.carts
-                        .Include(c => c.CartItems)
-                            .ThenInclude(ci => ci.MenuItem)
-                        .Include(c => c.CartItems)
-                            .ThenInclude(ci => ci.MeatType)
-                        .Include(c => c.CartItems)
-                            .ThenInclude(ci => ci.Souce)
-                        .Include(c => c.CartItems)
-                            .ThenInclude(ci => ci.ExtraIngredientsLinks)
-                                .ThenInclude(link => link.ExtraIngredient)
-                        .FirstOrDefaultAsync(c => c.Id == cartId);
-
-                    //_logger.LogInformation("---KOSZYK---\n{cart}", JsonConvert.SerializeObject(cart, Formatting.Indented));
+                    var cart = await _context.carts.FirstOrDefaultAsync(c => c.Id == cartId);
 
                     if (cart == null)
                     {
-                        _logger.LogWarning("Brak cartu");
+                        _logger.LogWarning("Koszyk o ID {cartId} nie znaleziony", cartId);
                         return NotFound("Cart not found");
                     }
 
                     cart.IsPaid = true;
-                    cart.Email = emailStr;
-                    cart.Address = addressStr;
+                    cart.Email = session.Metadata["email"];
+                    cart.Address = session.Metadata["address"];
+                    cart.IsProcessed = false; // <--- Kluczowa linia: oznacz do późniejszego przetworzenia
 
-                    var response = new CartResponse
-                    {
-                        Id = cart.Id,
-                        Total = cart.Total,
-                        CreatedAt = cart.CreatedAt,
-                        IsFinished = cart.IsFinished,
-                        CartItems = cart.CartItems.Select(ci => new CartItemInCartResponse
-                        {
-                            Id = ci.Id,
-                            MenuItemName = ci.MenuItem.Name,
-                            MeatName = ci.MeatType.Name,
-                            SouceName = ci.Souce.Name,
-                            ExtraNames = ci.ExtraIngredientsLinks
-                                            .Select(link => link.ExtraIngredient.Name)
-                                            .ToList(),
-                            Size = ci.Size,
-                            TotalPrice = ci.TotalPrice
-                        }).ToList()
-                    };
-
-                    // Signall
-
-
-                    await _hubContext.Clients.All.SendAsync("NewOrder", response);
-
-                    await _emailService.SendHtmlEmail(
-                        emailStr,
-                        "Potwierdzenie płatności - Kebab King",
-                        "PaymentConfirmation.html",
-                        new Dictionary<string, string>
-                        {
-                            { "UserEmail", emailStr },
-                            { "CartId", cart.Id.ToString() }
-                        }
-                    );
-
-
-                    _context.Entry(cart).Property(c => c.IsPaid).IsModified = true;
+                    _context.Update(cart);
                     await _context.SaveChangesAsync();
 
-
+                    _logger.LogInformation("✅ Koszyk {cartId} oznaczony jako opłacony", cartId);
                 }
 
                 return Ok();
             }
             catch (StripeException ex)
             {
-                _logger.LogError($"StripeException: {ex.Message}");
+                _logger.LogError(ex, "StripeException w webhooku");
                 return BadRequest("Stripe validation failed");
             }
             catch (Exception ex)
             {
-                _logger.LogError($"Błąd ogólny: {ex.Message}");
+                _logger.LogError(ex, "Błąd przetwarzania webhooka");
                 return StatusCode(500, "Internal error");
             }
         }
 
+
         [HttpPost("create-payment-session")]
         public async Task<IActionResult> CreateCheckoutSession([FromBody] CreateCheckoutRequest request)
         {
-            await _hubContext.Clients.All.SendAsync("NewOrder", "response");
-
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
 
             StripeConfiguration.ApiKey = _configuration["Stripe:SecretKey"];
+            if (!Guid.TryParse(request.CartId, out var cartId))
+            {
+                _logger.LogWarning("Nieprawidłowy cartId.");
+                return BadRequest("Nieprawidłowy cartId.");
+            }
 
-            Guid CartId = Guid.Parse(request.CartId);
             var cart = await _context.carts
                .Include(c => c.CartItems)
                    .ThenInclude(ci => ci.MenuItem)
@@ -174,29 +125,22 @@ namespace kebabBackend.Controllers
                .Include(c => c.CartItems)
                    .ThenInclude(ci => ci.ExtraIngredientsLinks)
                        .ThenInclude(link => link.ExtraIngredient)
-               .FirstOrDefaultAsync(c => c.Id == CartId);
+               .FirstOrDefaultAsync(c => c.Id == cartId);
 
             if (cart == null)
-            {
-                _logger.LogWarning("Złe cartId");
-                return NotFound("Cart not found");
-            }
-            if(cart.IsPaid)
-            {
-                _logger.LogWarning("CartId już opłacone");
-                return BadRequest("Cart is arleady paid");
-            }
-            
-            if(cart.Address == "")
+                return NotFound("Koszyk nie istnieje.");
+
+            if (cart.IsPaid)
+                return BadRequest("Koszyk już został opłacony.");
+
+            if (string.IsNullOrWhiteSpace(request.Address))
             {
                 cart.Address = "PickUp";
-            } else
+            }
+            else
             {
                 if (!await _azureMapsDistanceService.IsWithinDeliveryRangeAsync(request.Address))
-                {
-                    _logger.LogWarning("Address znajduję się poza sferą dostawy");
-                    return BadRequest("Address znajduję się poza sferą dostawy (30 km)");
-                }
+                    return BadRequest("Adres poza strefą dostawy (30 km)");
             }
 
             var cartItemsHtml = string.Join("", cart.CartItems.Select(ci => $@"
@@ -209,7 +153,7 @@ namespace kebabBackend.Controllers
 
             var totalPrice = (long)(cart.Total * 100);
 
-            var option = new SessionCreateOptions
+            var options = new SessionCreateOptions
             {
                 PaymentMethodTypes = new List<string> { "card" },
                 LineItems = new List<SessionLineItemOptions>
@@ -222,7 +166,7 @@ namespace kebabBackend.Controllers
                             UnitAmount = totalPrice,
                             ProductData = new SessionLineItemPriceDataProductDataOptions
                             {
-                                Name = "Zamówienie Kebab" + cart.Id.ToString().Substring(0,8),
+                                Name = "Zamówienie Kebab " + cart.Id.ToString().Substring(0, 8)
                             }
                         },
                         Quantity = 1
@@ -235,18 +179,17 @@ namespace kebabBackend.Controllers
                 {
                     { "cartId", cart.Id.ToString() },
                     { "address", request.Address },
-                    { "email", request.Email },
+                    { "email", request.Email }
                 }
             };
 
             var service = new SessionService();
-            var session = service.Create(option);
-
+            var session = service.Create(options);
 
             await _emailService.SendHtmlEmail(
                 request.Email,
                 "Potwierdzenie zamówienia - Kebab King",
-                "OrderConfirmation.html", 
+                "OrderConfirmation.html",
                 new Dictionary<string, string>
                 {
                     { "UserEmail", request.Email },
@@ -254,11 +197,9 @@ namespace kebabBackend.Controllers
                     { "Total", cart.Total.ToString("F2") },
                     { "Address", request.Address },
                     { "CartItems", cartItemsHtml }
-                }
-            );
+                });
 
             return Ok(new { sessionId = session.Id });
         }
-        
     }
 }

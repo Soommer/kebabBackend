@@ -46,6 +46,8 @@ namespace kebabBackend
             var jwtSettings = builder.Configuration.GetSection("Jwt").Get<JwtSettings>();
             builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("Jwt"));
             builder.Services.AddSingleton(jwtSettings);
+            builder.Services.AddHostedService<CartProcessingService>();
+
             builder.Services.AddMemoryCache();
 
 
