@@ -17,5 +17,10 @@ namespace kebabBackend.Services
             Console.WriteLine($"🔴 SignalR: client disconnected ({Context.ConnectionId})");
             await base.OnDisconnectedAsync(exception);
         }
+
+        public async Task SendOrderUpdate(string orderId)
+        {
+            await Clients.All.SendAsync("Update", orderId);
+        }
     }
 }

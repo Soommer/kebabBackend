@@ -18,6 +18,7 @@ using System.Text;
 using Serilog;
 using Azure.Storage.Blobs;
 using Microsoft.Extensions.Options;
+using Microsoft.Azure.SignalR;
 
 namespace kebabBackend
 {
@@ -35,10 +36,8 @@ namespace kebabBackend
             var builder = WebApplication.CreateBuilder(args);
             var config = builder.Configuration;
 
-            builder.Services.AddSignalR(options =>
-            {
-                options.KeepAliveInterval = TimeSpan.FromSeconds(20);
-            });
+            builder.Services.AddSignalR().AddAzureSignalR();
+
             builder.Host.UseSerilog();
 
             builder.Services.AddControllers();
@@ -113,7 +112,7 @@ builder.Services.AddCors(options =>
                 "https://green-flower-00291e603.2.azurestaticapps.net",
                 "https://mango-plant-0d70ff103.1.azurestaticapps.net",
                 "http://localhost:4200",
-                "http://localhost:4400"
+                "http://localhost:5173"
             )
             .AllowAnyHeader()
             .AllowAnyMethod()
@@ -151,14 +150,21 @@ builder.Services.AddCors(options =>
                 app.UseSwaggerUI();
                 //}
 
+                app.UseRouting();
                 app.UseCors("AllowFrontend");
 
 
-                app.UseHttpsRedirection();
+                //app.UseHttpsRedirection();
 
                 app.UseAuthentication();
                 app.UseAuthorization();
-                app.MapHub<OrderHub>("/orderHub");
+
+                app.UseEndpoints(endpoints =>
+                {
+                    endpoints.MapControllers();
+                    endpoints.MapHub<OrderHub>("/orderHub");
+
+                });
 
 
                 /*
@@ -174,7 +180,6 @@ builder.Services.AddCors(options =>
                     RequestPath = "/Images"
                 });
                 */
-                app.MapControllers();
                 try
                 {
                     Log.Information("Strat....");

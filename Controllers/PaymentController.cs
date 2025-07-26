@@ -1,4 +1,5 @@
-﻿using kebabBackend.Data;
+﻿using Azure;
+using kebabBackend.Data;
 using kebabBackend.Models.DTO;
 using kebabBackend.Services;
 using Microsoft.AspNetCore.Mvc;
@@ -114,6 +115,10 @@ namespace kebabBackend.Controllers
                             TotalPrice = ci.TotalPrice
                         }).ToList()
                     };
+
+                    // Signall
+
+
                     await _hubContext.Clients.All.SendAsync("NewOrder", response);
 
                     await _emailService.SendHtmlEmail(
@@ -151,6 +156,7 @@ namespace kebabBackend.Controllers
         [HttpPost("create-payment-session")]
         public async Task<IActionResult> CreateCheckoutSession([FromBody] CreateCheckoutRequest request)
         {
+            await _hubContext.Clients.All.SendAsync("NewOrder", "response");
 
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
@@ -235,6 +241,7 @@ namespace kebabBackend.Controllers
 
             var service = new SessionService();
             var session = service.Create(option);
+
 
             await _emailService.SendHtmlEmail(
                 request.Email,
