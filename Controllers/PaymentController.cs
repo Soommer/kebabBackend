@@ -32,7 +32,7 @@ namespace kebabBackend.Controllers
             _configuration = configuration;
             _emailService = emailService;
             _azureMapsDistanceService = azureMapsDistanceService;
-            _logger = logger;   
+            _logger = logger;
             _hubContext = hubContext;
         }
 
@@ -41,12 +41,17 @@ namespace kebabBackend.Controllers
         {
             StripeConfiguration.ApiKey = _configuration["Stripe:SecretKey"];
 
+            HttpContext.Request.EnableBuffering(); // <- kluczowe
+
             var json = await new StreamReader(HttpContext.Request.Body).ReadToEndAsync();
+
+            HttpContext.Request.Body.Position = 0;
             var stripeSignature = Request.Headers["Stripe-Signature"];
             var endpointSecret = _configuration["Stripe:WebhookSecret"];
 
             try
             {
+                _logger.LogInformation("🔄 Webhook payload: {Payload}", json);
                 var stripeEvent = EventUtility.ConstructEvent(json, stripeSignature, endpointSecret);
 
                 if (stripeEvent.Type == EventTypes.CheckoutSessionCompleted)
@@ -83,7 +88,7 @@ namespace kebabBackend.Controllers
                                 .ThenInclude(link => link.ExtraIngredient)
                         .FirstOrDefaultAsync(c => c.Id == cartId);
 
-                    //_logger.LogInformation("---KOSZYK---\n{cart}", JsonConvert.SerializeObject(cart, Formatting.Indented));
+                    _logger.LogDebug("---KOSZYK---\n{cart}", JsonConvert.SerializeObject(cart, Formatting.Indented));
 
                     if (cart == null)
                     {
@@ -114,6 +119,10 @@ namespace kebabBackend.Controllers
                             TotalPrice = ci.TotalPrice
                         }).ToList()
                     };
+
+                    // Log the response for debuggin
+                    _logger.LogDebug("---KOSZYK---\n{cart}", JsonConvert.SerializeObject(cart, Formatting.Indented));
+
                     await _hubContext.Clients.All.SendAsync("NewOrder", response);
 
                     await _emailService.SendHtmlEmail(
@@ -175,16 +184,17 @@ namespace kebabBackend.Controllers
                 _logger.LogWarning("Złe cartId");
                 return NotFound("Cart not found");
             }
-            if(cart.IsPaid)
+            if (cart.IsPaid)
             {
                 _logger.LogWarning("CartId już opłacone");
                 return BadRequest("Cart is arleady paid");
             }
-            
-            if(cart.Address == "")
+
+            if (cart.Address == "")
             {
                 cart.Address = "PickUp";
-            } else
+            }
+            else
             {
                 if (!await _azureMapsDistanceService.IsWithinDeliveryRangeAsync(request.Address))
                 {
@@ -239,7 +249,7 @@ namespace kebabBackend.Controllers
             await _emailService.SendHtmlEmail(
                 request.Email,
                 "Potwierdzenie zamówienia - Kebab King",
-                "OrderConfirmation.html", 
+                "OrderConfirmation.html",
                 new Dictionary<string, string>
                 {
                     { "UserEmail", request.Email },
@@ -252,6 +262,6 @@ namespace kebabBackend.Controllers
 
             return Ok(new { sessionId = session.Id });
         }
-        
+
     }
 }

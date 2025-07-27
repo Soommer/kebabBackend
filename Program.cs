@@ -1,4 +1,4 @@
-using kebabBackend.Data;
+ï»¿using kebabBackend.Data;
 using kebabBackend.Repositories.Cart;
 using kebabBackend.Repositories.CartItems;
 using kebabBackend.Repositories.Ingridients;
@@ -176,7 +176,7 @@ namespace kebabBackend
                 }
                 catch (Exception ex)
                 {
-                    Log.Fatal(ex, "Aplikacja zakoñczy³a siê niepowodzeniem");
+                    Log.Fatal(ex, "Aplikacja zakoÃ±czyÂ³a siÃª niepowodzeniem");
                 }
                 finally
                 {
