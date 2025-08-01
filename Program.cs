@@ -113,6 +113,8 @@ builder.Services.AddCors(options =>
                 "https://zealous-stone-0b5e11903.2.azurestaticapps.net",
                 "https://green-flower-00291e603.2.azurestaticapps.net",
                 "https://mango-plant-0d70ff103.1.azurestaticapps.net",
+                "https://lively-forest-01e6ed703.1.azurestaticapps.net",
+                "https://dashboard.wonderfulsand-657cf16a.polandcentral.azurecontainerapps.io",
                 "http://localhost:4200",
                 "http://localhost:5173"
             )
@@ -144,6 +146,12 @@ builder.Services.AddCors(options =>
             builder.Services.AddHttpContextAccessor();
 
             var app = builder.Build();
+            app.Use(async (context, next) =>
+            {
+                context.Request.EnableBuffering(); 
+                await next();
+            });
+
 
             // Middleware
             //if (app.Environment.IsDevelopment())
@@ -156,7 +164,6 @@ builder.Services.AddCors(options =>
                 app.UseCors("AllowFrontend");
 
 
-                //app.UseHttpsRedirection();
 
                 app.UseAuthentication();
                 app.UseAuthorization();

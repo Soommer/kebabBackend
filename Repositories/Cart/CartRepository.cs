@@ -179,6 +179,7 @@ namespace kebabBackend.Repositories.Cart
 
             cart.IsFinished = true;
             cart.IsActive = false;
+            cart.IsProcessed = true; 
 
             await _context.SaveChangesAsync();
             return true;

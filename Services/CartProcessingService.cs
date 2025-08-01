@@ -33,7 +33,7 @@ namespace kebabBackend.Services
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            _logger.LogInformation("✅ CartProcessingService uruchomiony.");
+            _logger.LogInformation("CartProcessingService uruchomiony.");
 
             while (!stoppingToken.IsCancellationRequested)
             {
@@ -57,43 +57,50 @@ namespace kebabBackend.Services
 
                     foreach (var cart in cartsToProcess)
                     {
-                        _logger.LogInformation("🚚 Przetwarzanie zamówienia: {CartId}", cart.Id);
-
-                        var response = new CartResponse
+                        try
                         {
-                            Id = cart.Id,
-                            Total = cart.Total,
-                            CreatedAt = cart.CreatedAt,
-                            IsFinished = cart.IsFinished,
-                            CartItems = cart.CartItems.Select(ci => new CartItemInCartResponse
+                            _logger.LogInformation("Przetwarzanie zamówienia: {CartId}", cart.Id);
+
+                            var response = new CartResponse
                             {
-                                Id = ci.Id,
-                                MenuItemName = ci.MenuItem.Name,
-                                MeatName = ci.MeatType.Name,
-                                SouceName = ci.Souce.Name,
-                                ExtraNames = ci.ExtraIngredientsLinks.Select(e => e.ExtraIngredient.Name).ToList(),
-                                Size = ci.Size,
-                                TotalPrice = ci.TotalPrice
-                            }).ToList()
-                        };
+                                Id = cart.Id,
+                                Total = cart.Total,
+                                CreatedAt = cart.CreatedAt,
+                                IsFinished = cart.IsFinished,
+                                CartItems = cart.CartItems.Select(ci => new CartItemInCartResponse
+                                {
+                                    Id = ci.Id,
+                                    MenuItemName = ci.MenuItem.Name,
+                                    MeatName = ci.MeatType.Name,
+                                    SouceName = ci.Souce.Name,
+                                    ExtraNames = ci.ExtraIngredientsLinks.Select(e => e.ExtraIngredient.Name).ToList(),
+                                    Size = ci.Size,
+                                    TotalPrice = ci.TotalPrice
+                                }).ToList()
+                            };
 
-                        await _hubContext.Clients.All.SendAsync("NewOrder", response, stoppingToken);
-                        _logger.LogInformation("📡 Wysłano SignalR NewOrder dla koszyka: {CartId}", cart.Id);
+                            await _hubContext.Clients.All.SendAsync("NewOrder", response, stoppingToken);
+                            _logger.LogInformation("Wysłano SignalR NewOrder dla koszyka: {CartId}", cart.Id);
 
-                        await _emailService.SendHtmlEmail(
-                            cart.Email,
-                            "Potwierdzenie płatności - Kebab King",
-                            "PaymentConfirmation.html",
-                            new Dictionary<string, string>
-                            {
-                                { "UserEmail", cart.Email },
-                                { "CartId", cart.Id.ToString() }
-                            }
-                        );
-                        _logger.LogInformation("📨 Wysłano e-mail do: {Email}", cart.Email);
+                            await _emailService.SendHtmlEmail(
+                                cart.Email,
+                                "Potwierdzenie płatności - Kebab King",
+                                "PaymentConfirmation.html",
+                                new Dictionary<string, string>
+                                {
+                                    { "UserEmail", cart.Email },
+                                    { "CartId", cart.Id.ToString() }
+                                }
+                            );
+                            _logger.LogInformation("Wysłano e-mail do: {Email}", cart.Email);
 
-                        cart.IsProcessed = true;
-                        db.carts.Update(cart);
+                            cart.IsProcessed = true;
+                            db.Entry(cart).Property(c => c.IsProcessed).IsModified = true;
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError(ex, " Błąd podczas przetwarzania koszyka {CartId}", cart.Id);
+                        }
                     }
 
                     if (cartsToProcess.Count > 0)
@@ -101,13 +108,13 @@ namespace kebabBackend.Services
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "❌ Błąd w CartProcessingService");
+                    _logger.LogError(ex, "Błąd w CartProcessingService");
                 }
 
-                await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
+                await Task.Delay(TimeSpan.FromSeconds(30), stoppingToken);
             }
 
-            _logger.LogInformation("🛑 CartProcessingService zatrzymany.");
+            _logger.LogInformation("CartProcessingService zatrzymany.");
         }
     }
 }

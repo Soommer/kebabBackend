@@ -40,36 +40,38 @@ namespace kebabBackend.Controllers
         public async Task<IActionResult> StripeWebhook()
         {
             StripeConfiguration.ApiKey = _configuration["Stripe:SecretKey"];
-
             HttpContext.Request.EnableBuffering(); // <- kluczowe
 
             var json = await new StreamReader(HttpContext.Request.Body).ReadToEndAsync();
+            HttpContext.Request.Body.Position = 0; // Resetuj pozycję strumienia
 
-            HttpContext.Request.Body.Position = 0;
             var stripeSignature = Request.Headers["Stripe-Signature"];
             var endpointSecret = _configuration["Stripe:WebhookSecret"];
 
+            _logger.LogInformation("Webhook payload: {Body}", json);
+            _logger.LogInformation("Webhook signature: {Signature}", stripeSignature);
+
             try
             {
-                _logger.LogInformation("🔄 Webhook payload: {Payload}", json);
                 var stripeEvent = EventUtility.ConstructEvent(json, stripeSignature, endpointSecret);
 
                 if (stripeEvent.Type == EventTypes.CheckoutSessionCompleted)
                 {
                     var session = stripeEvent.Data.Object as Session;
+
                     if (session?.Metadata == null ||
                         !session.Metadata.ContainsKey("cartId") ||
                         !session.Metadata.ContainsKey("address") ||
                         !session.Metadata.ContainsKey("email"))
                     {
-                        _logger.LogWarning("Brak wymaganych metadanych w sesji Stripe");
+                        _logger.LogWarning(" Brakuje wymaganych metadanych w sesji.");
                         return BadRequest("Brakuje danych w metadanych");
                     }
 
                     var cartIdStr = session.Metadata["cartId"];
                     if (!Guid.TryParse(cartIdStr, out var cartId))
                     {
-                        _logger.LogWarning("Nieprawidłowy format cartId: {cartId}", cartIdStr);
+                        _logger.LogWarning("Nieprawidłowy cartId: {cartId}", cartIdStr);
                         return BadRequest("Nieprawidłowy cartId");
                     }
 
@@ -77,64 +79,39 @@ namespace kebabBackend.Controllers
 
                     if (cart == null)
                     {
-                        _logger.LogWarning("Koszyk o ID {cartId} nie znaleziony", cartId);
+                        _logger.LogWarning(" Koszyk {cartId} nie istnieje", cartId);
                         return NotFound("Cart not found");
                     }
 
                     cart.IsPaid = true;
                     cart.Email = session.Metadata["email"];
                     cart.Address = session.Metadata["address"];
-                    cart.IsProcessed = false; // <--- Kluczowa linia: oznacz do późniejszego przetworzenia
+                    cart.IsProcessed = false;
 
-                    var response = new CartResponse
+                    _context.Update(cart);
+                    try
                     {
-                        Id = cart.Id,
-                        Total = cart.Total,
-                        CreatedAt = cart.CreatedAt,
-                        IsFinished = cart.IsFinished,
-                        CartItems = cart.CartItems.Select(ci => new CartItemInCartResponse
-                        {
-                            Id = ci.Id,
-                            MenuItemName = ci.MenuItem.Name,
-                            MeatName = ci.MeatType.Name,
-                            SouceName = ci.Souce.Name,
-                            ExtraNames = ci.ExtraIngredientsLinks
-                                            .Select(link => link.ExtraIngredient.Name)
-                                            .ToList(),
-                            Size = ci.Size,
-                            TotalPrice = ci.TotalPrice
-                        }).ToList()
-                    };
-                    await _hubContext.Clients.All.SendAsync("NewOrder", response);
+                        await _context.SaveChangesAsync();
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, " Błąd przy zapisie cartu");
+                        return StatusCode(500, "Błąd zapisu do bazy danych");
+                    }
 
-                    await _emailService.SendHtmlEmail(
-                        emailStr,
-                        "Potwierdzenie płatności - Kebab King",
-                        "PaymentConfirmation.html",
-                        new Dictionary<string, string>
-                        {
-                            { "UserEmail", emailStr },
-                            { "CartId", cart.Id.ToString() }
-                        }
-                    );
-
-
-                    _context.Entry(cart).Property(c => c.IsPaid).IsModified = true;
-                    await _context.SaveChangesAsync();
-
-                    _logger.LogInformation("✅ Koszyk {cartId} oznaczony jako opłacony", cartId);
+                    _logger.LogInformation("Cart {cartId} updated as paid and unprocessed", cartId);
                 }
 
                 return Ok();
             }
             catch (StripeException ex)
             {
-                _logger.LogError(ex, "StripeException w webhooku");
+                _logger.LogError(" Stripe exception: {Message}", ex.Message);
                 return BadRequest("Stripe validation failed");
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Błąd przetwarzania webhooka");
+                _logger.LogError("General exception: {Message}", ex.Message);
                 return StatusCode(500, "Internal error");
             }
         }
