@@ -37,7 +37,7 @@ namespace kebabBackend.Repositories.MenuItem
             var imageId = Guid.NewGuid();
             var fileName = $"{imageId}{extension}";
 
-            // Upload to Blob
+            // Upload do Blob
             var blobClient = _blobServiceClient
                 .GetBlobContainerClient("images")
                 .GetBlobClient(fileName);

@@ -27,17 +27,17 @@ namespace kebabBackend.Controllers
         {
             try
             {
-                // Próbujemy pobrać z cache
+                //  pobieranie z cache
                 if (_cache.TryGetValue(cacheKey, out List<Souce> cachedList))
                 {
                     _logger.LogInformation("Zwraca sosy z cache.");
                     return Ok(cachedList);
                 }
 
-                // Jeśli nie ma w cache – pobierz z repozytorium
+                // Jeśli nie ma w cache =  repozytorium
                 var list = await _repo.GetAllAsync();
 
-                // Ustaw cache na 10 minut (lub jak chcesz)
+                // Ustawia cache na 10 minut
                 var cacheOptions = new MemoryCacheEntryOptions()
                     .SetAbsoluteExpiration(TimeSpan.FromMinutes(10));
 

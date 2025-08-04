@@ -40,10 +40,10 @@ namespace kebabBackend.Controllers
         public async Task<IActionResult> StripeWebhook()
         {
             StripeConfiguration.ApiKey = _configuration["Stripe:SecretKey"];
-            HttpContext.Request.EnableBuffering(); // <- kluczowe
+            HttpContext.Request.EnableBuffering();
 
             var json = await new StreamReader(HttpContext.Request.Body).ReadToEndAsync();
-            HttpContext.Request.Body.Position = 0; // Resetuj pozycję strumienia
+            HttpContext.Request.Body.Position = 0; 
 
             var stripeSignature = Request.Headers["Stripe-Signature"];
             var endpointSecret = _configuration["Stripe:WebhookSecret"];

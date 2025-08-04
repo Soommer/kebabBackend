@@ -41,7 +41,7 @@ namespace kebabBackend.Services
             message.Body = new TextPart("html") { Text = template };
 
             using var client = new SmtpClient();
-            client.ServerCertificateValidationCallback = (s, c, h, e) => true; // do usunięcia w produkcji
+            client.ServerCertificateValidationCallback = (s, c, h, e) => true; 
             await client.ConnectAsync(_config["Email:SmtpServer"], int.Parse(_config["Email:Port"]), true);
             await client.AuthenticateAsync(_config["Email:Username"], _config["Email:Password"]);
             await client.SendAsync(message);

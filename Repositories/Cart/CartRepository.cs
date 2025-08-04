@@ -152,7 +152,7 @@ namespace kebabBackend.Repositories.Cart
          return await _context.carts
          .Include(c => c.CartItems)
              .ThenInclude(ci => ci.MenuItem)
-             .Where(c => !c.IsFinished)
+             .Where(c => !c.IsFinished && c.IsPaid)
          .OrderByDescending(c => c.CreatedAt)
          .Select(c => new CartResponse
          {
